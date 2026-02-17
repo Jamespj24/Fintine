@@ -33,12 +33,14 @@ class RealGeminiVision:
         - Do not hallucinate values. If a field is missing, use null or 0.
         
         Extract the following details in JSON format:
+        Extract the following details in JSON format:
         - vendor (string)
         - amount (number)
         - currency (string, always use "INR" or "₹" if unsure, but try to detect)
         - date (YYYY-MM-DD string)
         - category (string, e.g. Office Supplies, Travel, Food)
         - description (short summary string, e.g. "Lunch meeting", "Printer paper")
+        - billed_to (string, the person or company being billed/paying)
         
         Return ONLY valid JSON. No markdown backticks.
         """

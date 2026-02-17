@@ -321,6 +321,7 @@ const Dashboard = () => {
                                 <tr>
                                     <th className="p-4 font-medium">Date</th>
                                     <th className="p-4 font-medium">Vendor</th>
+                                    <th className="p-4 font-medium">Billed To</th>
                                     <th className="p-4 font-medium">Description</th>
                                     <th className="p-4 font-medium">Category</th>
                                     <th className="p-4 font-medium">Amount</th>
@@ -337,6 +338,7 @@ const Dashboard = () => {
                                     >
                                         <td className="p-4 text-neutral-400">{item.date}</td>
                                         <td className="p-4 font-medium">{item.vendor}</td>
+                                        <td className="p-4 text-neutral-400">{item.billed_to || "—"}</td>
                                         <td className="p-4 text-neutral-400 text-xs max-w-[200px] truncate" title={item.description}>{item.description}</td>
                                         <td className="p-4">
                                             <span className="px-2 py-1 bg-neutral-800 rounded-md text-xs">{item.category}</span>

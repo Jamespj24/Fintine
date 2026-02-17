@@ -78,6 +78,7 @@ async def upload_receipt(file: UploadFile = File(...)):
             analysis.get("amount", 0),
             analysis.get("category", "Uncategorized"),
             analysis.get("description", ""),
+            analysis.get("billed_to", "Unknown"),
             "Pending" # Status
         ]
         

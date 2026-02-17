@@ -8,13 +8,13 @@ class MockSheetAppender:
     def __init__(self):
         # Initial Seed Data for Mock Mode (So it's not empty)
         self.data = [
-             {"date": "2023-10-24", "vendor": "AWS Web Services", "amount": "$1,200.00", "category": "Infrastructure", "description": "Cloud Hosting", "status": "Paid"},
-             {"date": "2023-10-25", "vendor": "WeWork", "amount": "$850.00", "category": "Office", "description": "Co-working entry", "status": "Paid"}
+             {"date": "2023-10-24", "vendor": "AWS Web Services", "amount": "$1,200.00", "category": "Infrastructure", "description": "Cloud Hosting", "billed_to": "Fintine Inc", "status": "Paid"},
+             {"date": "2023-10-25", "vendor": "WeWork", "amount": "$850.00", "category": "Office", "description": "Co-working entry", "billed_to": "John Doe", "status": "Paid"}
         ]
         print("⚠️  USING MOCK SHEETS DB - DATA WILL NOT PERSIST")
 
     def append_row(self, values):
-        # Value is list: [Date, Vendor, Amount, Category, Description, Status]
+        # Value is list: [Date, Vendor, Amount, Category, Description, BilledTo, Status]
         # Convert to dict for get_all_records consistency in mock
         record = {
             "date": values[0],
@@ -22,7 +22,8 @@ class MockSheetAppender:
             "amount": f"${values[2]}",
             "category": values[3],
             "description": values[4],
-            "status": values[5]
+            "billed_to": values[5],
+            "status": values[6]
         }
         print(f"📝 [MOCK] Appending to sheet: {record}")
         self.data.insert(0, record) # Prepend
@@ -53,9 +54,12 @@ class RealSheetAppender:
 
         # Check for headers and init if empty
         try:
-            if not self.sheet.get_all_values():
+            rows = self.sheet.get_all_values()
+            if not rows:
                 print("📝 Initializing Sheet Headers...")
-                self.sheet.append_row(["date", "vendor", "amount", "category", "description", "status"])
+                self.sheet.append_row(["date", "vendor", "amount", "category", "description", "billed_to", "status"])
+            elif "billed_to" not in [str(c).lower().strip() for c in rows[0]]:
+                 print("⚠️ 'billed_to' column missing in existing sheet. Appending to header (User may need to fix manually).")
         except Exception as e:
             print(f"⚠️ Error checking headers: {e}")
 
@@ -82,7 +86,7 @@ class RealSheetAppender:
              records = []
              for row in rows:
                  # Ensure row has enough columns (pad with empty strings)
-                 while len(row) < 6:
+                 while len(row) < 7:
                      row.append("")
                      
                  record = {
@@ -91,7 +95,8 @@ class RealSheetAppender:
                      "amount": row[2],
                      "category": row[3],
                      "description": row[4],
-                     "status": row[5]
+                     "billed_to": row[5],
+                     "status": row[6]
                  }
                  records.append(record)
                  
