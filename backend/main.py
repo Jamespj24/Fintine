@@ -6,13 +6,14 @@ import os
 import uvicorn
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
-# Tools
-from tools.google_sheets import get_sheet_db
-from tools.gemini import get_vision_model
-from graph import app_graph
+# Tools — lazy imports to avoid crashing on Vercel cold start
+def get_graph():
+    from graph import app_graph
+    return app_graph
 
 # App State
 processed_images_log = []
@@ -53,6 +54,7 @@ async def upload_receipt(file: UploadFile = File(...)):
         content = await file.read()
         
         # 1. Analyze with Gemini
+        from tools.gemini import get_vision_model
         vision = get_vision_model()
         # Mock Gemini expects list, Real expects bytes/dict
         # We wrapped it to handle clean dict interfaces?
@@ -89,6 +91,7 @@ async def upload_receipt(file: UploadFile = File(...)):
             invoice_no # Invoice No
         ]
         
+        from tools.google_sheets import get_sheet_db
         db = get_sheet_db()
         result = db.append_row(row_data)
         
@@ -133,7 +136,7 @@ async def run_agent():
         # Invoke the graph
         # Note: app_graph.invoke is synchronous unless using aRunner?
         # For demo, sync is fine if fast (mocked).
-        result = app_graph.invoke(initial_state)
+        result = get_graph().invoke(initial_state)
         
         # Log the output
         for log in result.get("logs", []):
@@ -170,6 +173,7 @@ def get_status():
 @app.get("/ledger")
 async def get_ledger():
     try:
+        from tools.google_sheets import get_sheet_db
         db = get_sheet_db()
         records = db.get_all_records()
         
@@ -189,6 +193,7 @@ class StatusUpdate(BaseModel):
 async def update_ledger_status(row_index: int, body: StatusUpdate):
     """Update the status of a ledger row. row_index is 0-based (first data row = 0)."""
     try:
+        from tools.google_sheets import get_sheet_db
         db = get_sheet_db()
         # Sheet row = row_index + 2 (1 for 0-index, 1 for header row)
         sheet_row = row_index + 2
@@ -213,6 +218,7 @@ class UpdateStatusRequest(BaseModel):
 async def update_ledger_status_by_content(body: UpdateStatusRequest):
     """Update status by finding the transaction content."""
     try:
+        from tools.google_sheets import get_sheet_db
         db = get_sheet_db()
         verification_data = {
             "date": body.date,
@@ -242,10 +248,12 @@ async def chat_with_agent(request: ChatRequest):
     print(f"💬 Chat Query: {request.query}")
     try:
         # 1. Get Data Context
+        from tools.google_sheets import get_sheet_db
         db = get_sheet_db()
         records = db.get_all_records()
         
         # 2. Call Gemini
+        from tools.gemini import get_vision_model
         vision = get_vision_model()
         response_text = vision.chat_with_data(request.query, records)
         
