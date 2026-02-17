@@ -23,6 +23,7 @@ class RealGeminiVision:
         - Do not hallucinate values. If a field is missing, use null or 0.
         
         Extract the following details in JSON format:
+        - invoice_number (string, look for "Invoice No", "Inv #", "Receipt #", etc. If none, returning null is okay)
         - vendor (string)
         - amount (number)
         - currency (string, always use "INR" or "₹" if unsure, but try to detect)

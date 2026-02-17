@@ -121,20 +121,30 @@ const Dashboard = () => {
         }
     };
 
-    const handleMarkPaid = async (rowIndex) => {
+    const handleMarkPaid = async (item, rowIndex) => {
         setUpdatingRow(rowIndex);
         try {
-            const res = await fetch(`${API_URL}/ledger/${rowIndex}/status`, {
+            const res = await fetch(`${API_URL}/ledger/update-status`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "Paid" })
+                body: JSON.stringify({
+                    date: item.date,
+                    vendor: item.vendor,
+                    amount: item.amount,
+                    invoice_no: item.invoice_no,
+                    new_status: "Paid"
+                })
             });
             const data = await res.json();
             if (data.status === "success") {
                 fetchLedger();
+            } else {
+                console.error("Update failed", data);
+                alert("Failed to update status: " + (data.message || "Unknown error"));
             }
         } catch (err) {
             console.error("Failed to update status", err);
+            alert("Network error: Failed to update status");
         } finally {
             setUpdatingRow(null);
         }
@@ -310,6 +320,7 @@ const Dashboard = () => {
                         <thead className="bg-neutral-950 text-neutral-400">
                             <tr>
                                 <th className="p-4 font-medium">Date</th>
+                                <th className="p-4 font-medium">Invoice No</th>
                                 <th className="p-4 font-medium">Vendor</th>
                                 <th className="p-4 font-medium">Billed To</th>
                                 <th className="p-4 font-medium">Description</th>
@@ -333,6 +344,7 @@ const Dashboard = () => {
                                         className="hover:bg-neutral-800/50 transition-colors"
                                     >
                                         <td className="p-4 text-neutral-400">{item.date}</td>
+                                        <td className="p-4 font-mono text-xs text-neutral-500">{item.invoice_no || "—"}</td>
                                         <td className="p-4 font-medium">{item.vendor}</td>
                                         <td className="p-4 text-neutral-400">{item.billed_to || "—"}</td>
                                         <td className="p-4 text-neutral-400 text-xs max-w-[200px] truncate" title={item.description}>{item.description}</td>
@@ -342,7 +354,7 @@ const Dashboard = () => {
                                         <td className="p-4 text-right font-mono">₹{amt.toLocaleString('en-IN')}</td>
                                         <td className="p-4 text-right font-mono text-neutral-400">₹{Math.round(taxable).toLocaleString('en-IN')}</td>
                                         <td className="p-4 text-right font-mono text-cyan-400">₹{Math.round(gst).toLocaleString('en-IN')}</td>
-                                        <td className="p-4">
+                                        <td className="p-4 whitespace-nowrap">
                                             <div className="flex items-center gap-2">
                                                 <span className={cn(
                                                     "px-2 py-1 rounded-full text-xs font-medium flex items-center w-fit gap-1",
@@ -353,7 +365,7 @@ const Dashboard = () => {
                                                 </span>
                                                 {item.status !== "Paid" && (
                                                     <button
-                                                        onClick={() => handleMarkPaid(i)}
+                                                        onClick={() => handleMarkPaid(item, i)}
                                                         disabled={updatingRow === i}
                                                         className="px-2 py-1 text-xs rounded-md bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors disabled:opacity-50 flex items-center gap-1"
                                                     >

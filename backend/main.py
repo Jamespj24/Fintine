@@ -68,9 +68,15 @@ async def upload_receipt(file: UploadFile = File(...)):
         print(f"🧠 Analysis: {analysis}")
         
         # 2. Append to Sheets
-        # Flatten dict to list of values in specific order?
-        # Or just dump JSON string?
-        # Let's flatten for a nice sheet: Date, Vendor, Amount, Category, Description
+        # Generate Invoice ID if missing
+        invoice_no = analysis.get("invoice_number")
+        if not invoice_no:
+            # Generate fallback: INV-{YYYYMMDD}-{VendorFirst3}-{AmountInt}
+            date_str = analysis.get("date", datetime.now().strftime("%Y-%m-%d")).replace("-", "")
+            vendor_slug = (analysis.get("vendor", "UNK")[:3]).upper()
+            amount_slug = int(float(analysis.get("amount", 0)))
+            invoice_no = f"INV-{date_str}-{vendor_slug}-{amount_slug}"
+            analysis["invoice_number"] = invoice_no # Add back to analysis
         
         row_data = [
             analysis.get("date", ""),
@@ -79,11 +85,18 @@ async def upload_receipt(file: UploadFile = File(...)):
             analysis.get("category", "Uncategorized"),
             analysis.get("description", ""),
             analysis.get("billed_to", "Unknown"),
-            "Pending" # Status
+            "Pending", # Status
+            invoice_no # Invoice No
         ]
         
         db = get_sheet_db()
         result = db.append_row(row_data)
+        
+        if result["status"] == "error":
+            if result["message"] == "Duplicate Invoice":
+                raise HTTPException(status_code=409, detail=f"Duplicate Invoice: {invoice_no}")
+            else:
+                 raise HTTPException(status_code=500, detail=result["message"])
         
         # Log for "Agent Feed"
         log_entry = {
@@ -180,10 +193,42 @@ async def update_ledger_status(row_index: int, body: StatusUpdate):
         # Sheet row = row_index + 2 (1 for 0-index, 1 for header row)
         sheet_row = row_index + 2
         # Status is column 7
-        result = db.update_cell(sheet_row, 7, body.status)
+        result = db.update_cell_value(sheet_row, 7, body.status)
         if result["status"] == "error":
             raise HTTPException(status_code=500, detail=result["message"])
         return {"status": "success", "row": row_index, "new_status": body.status}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class UpdateStatusRequest(BaseModel):
+    date: str
+    vendor: str
+    amount: str
+    new_status: str
+    invoice_no: Optional[str] = None
+
+@app.put("/ledger/update-status")
+async def update_ledger_status_by_content(body: UpdateStatusRequest):
+    """Update status by finding the transaction content."""
+    try:
+        db = get_sheet_db()
+        verification_data = {
+            "date": body.date,
+            "vendor": body.vendor,
+            "amount": body.amount,
+            "invoice_no": body.invoice_no
+        }
+        result = db.update_status_by_match(verification_data, body.new_status)
+        
+        if result["status"] == "error":
+             if result["message"] == "Transaction not found":
+                 raise HTTPException(status_code=404, detail="Transaction not found")
+             else:
+                 raise HTTPException(status_code=500, detail=result["message"])
+                 
+        return result
     except HTTPException:
         raise
     except Exception as e:
