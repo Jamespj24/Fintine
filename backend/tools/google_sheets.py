@@ -8,8 +8,8 @@ class MockSheetAppender:
     def __init__(self):
         # Initial Seed Data for Mock Mode (So it's not empty)
         self.data = [
-             {"date": "2023-10-24", "vendor": "AWS Web Services", "amount": "$1,200.00", "category": "Infrastructure", "status": "Paid"},
-             {"date": "2023-10-25", "vendor": "WeWork", "amount": "$850.00", "category": "Office", "status": "Paid"}
+             {"date": "2023-10-24", "vendor": "AWS Web Services", "amount": "$1,200.00", "category": "Infrastructure", "description": "Cloud Hosting", "status": "Paid"},
+             {"date": "2023-10-25", "vendor": "WeWork", "amount": "$850.00", "category": "Office", "description": "Co-working entry", "status": "Paid"}
         ]
         print("⚠️  USING MOCK SHEETS DB - DATA WILL NOT PERSIST")
 
@@ -50,6 +50,14 @@ class RealSheetAppender:
         except Exception:
              print("❌ Could not open 'BalanceAI_Ledger'. Falling back to Mock.")
              raise Exception("Sheet not found")
+
+        # Check for headers and init if empty
+        try:
+            if not self.sheet.get_all_values():
+                print("📝 Initializing Sheet Headers...")
+                self.sheet.append_row(["date", "vendor", "amount", "category", "description", "status"])
+        except Exception as e:
+            print(f"⚠️ Error checking headers: {e}")
 
     def append_row(self, values):
         try:

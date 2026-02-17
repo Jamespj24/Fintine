@@ -151,12 +151,21 @@ async def trigger_simulation(event_data: dict):
 def get_status():
     return {"logs": processed_images_log[-10:]} # Return last 10 logs
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/ledger")
 async def get_ledger():
     try:
         db = get_sheet_db()
         records = db.get_all_records()
-        return {"status": "success", "data": records}
+        
+        # Normalize keys to lowercase to handle mismatched Sheet headers (e.g. "Date" vs "date")
+        normalized_records = []
+        for r in records:
+            normalized_records.append({k.lower(): v for k, v in r.items()})
+            
+        return {"status": "success", "data": normalized_records}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

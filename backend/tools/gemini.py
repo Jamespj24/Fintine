@@ -35,10 +35,10 @@ class RealGeminiVision:
         Extract the following details in JSON format:
         - vendor (string)
         - amount (number)
-        - currency (string, e.g. USD)
+        - currency (string, always use "INR" or "₹" if unsure, but try to detect)
         - date (YYYY-MM-DD string)
         - category (string, e.g. Office Supplies, Travel, Food)
-        - description (short summary string)
+        - description (short summary string, e.g. "Lunch meeting", "Printer paper")
         
         Return ONLY valid JSON. No markdown backticks.
         """

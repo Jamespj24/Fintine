@@ -68,6 +68,7 @@ const Dashboard = () => {
 
         const interval = setInterval(async () => {
             fetchLogs();
+            fetchLedger(); // Poll for real-time ledger updates
             checkAgentHealth();
         }, 3000); // Poll every 3s
         return () => clearInterval(interval);
