@@ -52,8 +52,12 @@ class RealSheetAppender:
              raise Exception("Sheet not found")
 
     def append_row(self, values):
-        self.sheet.append_row(values)
-        return {"status": "success", "type": "real"}
+        try:
+            self.sheet.append_row(values)
+            return {"status": "success", "type": "real"}
+        except Exception as e:
+            print(f"❌ Sheets Append Error: {e}")
+            return {"status": "error", "message": str(e), "type": "real_failed"}
 
     def get_all_records(self):
         # Returns list of dicts

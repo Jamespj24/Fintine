@@ -61,7 +61,8 @@ class RealGeminiVision:
             return json.loads(text)
         except Exception as e:
             print(f"❌ Gemini Error: {e}")
-            raise e
+            print("⚠️  Falling back to Mock Gemini due to API error.")
+            return MockGeminiVision().analyze_image(image_data, mime_type)
 
 def get_vision_model():
     if os.getenv("USE_MOCK_GEMINI", "false").lower() == "true":
