@@ -151,8 +151,7 @@ async def trigger_simulation(event_data: dict):
 def get_status():
     return {"logs": processed_images_log[-10:]} # Return last 10 logs
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/ledger")
 async def get_ledger():

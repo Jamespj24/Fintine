@@ -70,7 +70,32 @@ class RealSheetAppender:
     def get_all_records(self):
         # Returns list of dicts
         try:
-             return self.sheet.get_all_records()
+             rows = self.sheet.get_all_values()
+             if not rows:
+                 return []
+             
+             # Check if first row is header
+             first_row = [str(c).lower().strip() for c in rows[0]]
+             if "date" in first_row and "vendor" in first_row:
+                 rows = rows[1:] # Skip header
+                 
+             records = []
+             for row in rows:
+                 # Ensure row has enough columns (pad with empty strings)
+                 while len(row) < 6:
+                     row.append("")
+                     
+                 record = {
+                     "date": row[0],
+                     "vendor": row[1],
+                     "amount": row[2],
+                     "category": row[3],
+                     "description": row[4],
+                     "status": row[5]
+                 }
+                 records.append(record)
+                 
+             return records
         except Exception as e:
              print(f"❌ Error fetching records: {e}")
              return []
