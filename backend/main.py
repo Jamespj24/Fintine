@@ -5,6 +5,9 @@ from typing import List, Optional
 import os
 import uvicorn
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Tools
 from tools.google_sheets import get_sheet_db
@@ -61,7 +64,7 @@ async def upload_receipt(file: UploadFile = File(...)):
         # RealGeminiVision uses:
         # genai to generate content.
         
-        analysis = vision.analyze_image(content)
+        analysis = vision.analyze_image(content, mime_type=file.content_type)
         print(f"🧠 Analysis: {analysis}")
         
         # 2. Append to Sheets
@@ -147,6 +150,38 @@ async def trigger_simulation(event_data: dict):
 @app.get("/agent/status")
 def get_status():
     return {"logs": processed_images_log[-10:]} # Return last 10 logs
+
+@app.get("/ledger")
+async def get_ledger():
+    try:
+        db = get_sheet_db()
+        records = db.get_all_records()
+        return {"status": "success", "data": records}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/agent/health")
+async def get_agent_health():
+    # Check Gemini
+    gemini_status = "inactive"
+    try:
+        if os.getenv("GEMINI_API_KEY"):
+             gemini_status = "active"
+    except:
+        pass
+
+    # Check Sheets
+    sheets_status = "mock"
+    if os.getenv("USE_MOCK_SHEETS", "false").lower() == "false":
+        sheets_status = "active"
+        
+    return {
+        "status": "online",
+        "components": {
+            "vision": gemini_status,
+            "database": sheets_status
+        }
+    }
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

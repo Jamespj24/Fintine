@@ -4,7 +4,7 @@ import json
 import time
 
 class MockGeminiVision:
-    def analyze_image(self, image_bytes):
+    def analyze_image(self, image_bytes, mime_type="image/jpeg"):
         print("⚠️  USING MOCK GEMINI - RETURNING CANNED RESPONSE")
         time.sleep(1.5) # Simulate processing delay
         return {
@@ -24,9 +24,15 @@ class RealGeminiVision:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-1.5-flash')
 
-    def analyze_image(self, image_data):
+    def analyze_image(self, image_data, mime_type="image/jpeg"):
         prompt = """
-        Analyze this receipt image. Extract the following details in JSON format:
+        You are an autonomous CFO Agent for a company. Your job is to extract financial data from receipts and invoices.
+        
+        GUARDRAILS:
+        - If the image is NOT a receipt, invoice, or financial document, return JSON with {"error": "Irrelevant image detected"}.
+        - Do not hallucinate values. If a field is missing, use null or 0.
+        
+        Extract the following details in JSON format:
         - vendor (string)
         - amount (number)
         - currency (string, e.g. USD)
@@ -42,7 +48,7 @@ class RealGeminiVision:
             response = self.model.generate_content([
                 prompt,
                 {
-                    "mime_type": "image/jpeg",
+                    "mime_type": mime_type,
                     "data": image_data
                 }
             ])

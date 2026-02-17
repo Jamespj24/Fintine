@@ -3,6 +3,8 @@
 # Function to kill processes on exit
 cleanup() {
     echo "🛑 Stopping Balance AI..."
+    pkill -f "uvicorn main:app" || true
+    pkill -f "vite" || true
     kill $BACKEND_PID $FRONTEND_PID 2>/dev/null
 }
 trap cleanup EXIT

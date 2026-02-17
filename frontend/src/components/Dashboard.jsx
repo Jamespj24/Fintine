@@ -22,26 +22,64 @@ const API_URL = "http://localhost:8000";
 
 const Dashboard = () => {
     const [logs, setLogs] = useState([]);
-    const [ledger, setLedger] = useState([
-        { date: "2023-10-24", vendor: "AWS Web Services", amount: "$1,200.00", category: "Infrastructure", status: "Paid" },
-        { date: "2023-10-25", vendor: "WeWork", amount: "$850.00", category: "Office", status: "Paid" },
-    ]);
+    const [ledger, setLedger] = useState([]);
+    const [agentStatus, setAgentStatus] = useState("checking");
     const [file, setFile] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // Poll for logs
+    // Initial Fetch & Polling
     useEffect(() => {
+        fetchLedger();
+        checkAgentHealth();
+
         const interval = setInterval(async () => {
-            try {
-                const res = await fetch(`${API_URL}/agent/status`);
-                const data = await res.json();
-                if (data.logs) setLogs(data.logs);
-            } catch (e) {
-                console.error("Polling failed", e);
-            }
-        }, 2000);
+            fetchLogs();
+            checkAgentHealth();
+        }, 3000); // Poll every 3s
         return () => clearInterval(interval);
     }, []);
+
+    const fetchLedger = async () => {
+        try {
+            const res = await fetch(`${API_URL}/ledger`);
+            const data = await res.json();
+            if (data.status === "success") {
+                setLedger(data.data);
+            }
+        } catch (e) {
+            console.error("Failed to fetch ledger", e);
+        }
+    };
+
+    const fetchLogs = async () => {
+        try {
+            const res = await fetch(`${API_URL}/agent/status`);
+            const data = await res.json();
+            if (data.logs) setLogs(data.logs);
+        } catch (e) {
+            console.error("Polling logs failed", e);
+        }
+    }
+
+    const checkAgentHealth = async () => {
+        try {
+            const res = await fetch(`${API_URL}/agent/health`);
+            const data = await res.json();
+
+            const visionActive = data.components?.vision === "active";
+            const dbActive = data.components?.database === "active";
+
+            if (visionActive && dbActive) {
+                setAgentStatus("active");
+            } else if (visionActive || dbActive) {
+                setAgentStatus("limited");
+            } else {
+                setAgentStatus("offline"); // Or inactive
+            }
+        } catch (e) {
+            setAgentStatus("offline");
+        }
+    };
 
     const handleFileUpload = async (e) => {
         const selectedFile = e.target.files?.[0];
@@ -64,14 +102,10 @@ const Dashboard = () => {
             const data = await res.json();
 
             if (data.status === "success") {
-                const newItem = {
-                    date: data.data.date || "Today",
-                    vendor: data.data.vendor || "Unknown",
-                    amount: `$${data.data.amount}`,
-                    category: data.data.category || "Uncategorized",
-                    status: "Pending" // Default
-                };
-                setLedger(prev => [newItem, ...prev]);
+                if (data.status === "success") {
+                    // Refresh ledger from backend instead of local append to ensure sync
+                    fetchLedger();
+                }
             }
         } catch (err) {
             console.error(err);
@@ -114,9 +148,24 @@ const Dashboard = () => {
                     >
                         <Activity className="mr-2 h-4 w-4" /> Run Audit
                     </Button>
-                    <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 rounded-full border border-green-500/20">
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-sm font-medium text-green-500">Agent Active</span>
+                    <div className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-full border transition-colors",
+                        agentStatus === "active" ? "bg-green-500/10 border-green-500/20" :
+                            agentStatus === "limited" ? "bg-yellow-500/10 border-yellow-500/20" : "bg-red-500/10 border-red-500/20"
+                    )}>
+                        <div className={cn(
+                            "w-2 h-2 rounded-full animate-pulse",
+                            agentStatus === "active" ? "bg-green-500" :
+                                agentStatus === "limited" ? "bg-yellow-500" : "bg-red-500"
+                        )} />
+                        <span className={cn(
+                            "text-sm font-medium",
+                            agentStatus === "active" ? "text-green-500" :
+                                agentStatus === "limited" ? "text-yellow-500" : "text-red-500"
+                        )}>
+                            {agentStatus === "active" ? "Agent Active" :
+                                agentStatus === "limited" ? "Partial Mode" : "Agent Offline"}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -180,7 +229,7 @@ const Dashboard = () => {
                                     id="file-upload"
                                     className="hidden"
                                     onChange={handleFileUpload}
-                                    accept="image/*"
+                                    accept="image/*,application/pdf"
                                 />
                                 <label
                                     htmlFor="file-upload"

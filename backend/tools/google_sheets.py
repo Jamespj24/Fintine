@@ -6,12 +6,26 @@ from datetime import datetime
 
 class MockSheetAppender:
     def __init__(self):
-        self.data = []
+        # Initial Seed Data for Mock Mode (So it's not empty)
+        self.data = [
+             {"date": "2023-10-24", "vendor": "AWS Web Services", "amount": "$1,200.00", "category": "Infrastructure", "status": "Paid"},
+             {"date": "2023-10-25", "vendor": "WeWork", "amount": "$850.00", "category": "Office", "status": "Paid"}
+        ]
         print("⚠️  USING MOCK SHEETS DB - DATA WILL NOT PERSIST")
 
     def append_row(self, values):
-        print(f"📝 [MOCK] Appending to sheet: {values}")
-        self.data.append(values)
+        # Value is list: [Date, Vendor, Amount, Category, Description, Status]
+        # Convert to dict for get_all_records consistency in mock
+        record = {
+            "date": values[0],
+            "vendor": values[1],
+            "amount": f"${values[2]}",
+            "category": values[3],
+            "description": values[4],
+            "status": values[5]
+        }
+        print(f"📝 [MOCK] Appending to sheet: {record}")
+        self.data.insert(0, record) # Prepend
         return {"status": "success", "row": len(self.data)}
 
     def get_all_records(self):
@@ -31,12 +45,9 @@ class RealSheetAppender:
         self.client = gspread.authorize(self.creds)
         
         # Open the sheet (assumes one exists or uses the first one)
-        # You might want to make the sheet name configurable
         try:
             self.sheet = self.client.open("BalanceAI_Ledger").sheet1
         except Exception:
-             # Fallback: Create if not exists logic is complex for gspread without drive perm, 
-             # so we assume it exists or fail to mock
              print("❌ Could not open 'BalanceAI_Ledger'. Falling back to Mock.")
              raise Exception("Sheet not found")
 
@@ -45,7 +56,12 @@ class RealSheetAppender:
         return {"status": "success", "type": "real"}
 
     def get_all_records(self):
-        return self.sheet.get_all_records()
+        # Returns list of dicts
+        try:
+             return self.sheet.get_all_records()
+        except Exception as e:
+             print(f"❌ Error fetching records: {e}")
+             return []
 
 def get_sheet_db():
     if os.getenv("USE_MOCK_SHEETS", "false").lower() == "true":
