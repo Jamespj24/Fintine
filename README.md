@@ -1,7 +1,7 @@
 # Balance AI ⚖️
 > **Autonomous Financial Controller for SMBs**
 
-Balance AI is an agentic financial system that automates the "boring" parts of business: bookkeeping, risk analysis, and receivables management. It uses **Gemini Vision** to see invoices and **LangGraph** to think like a CFO.
+Balance AI is an agentic financial system that automates the "boring" parts of business: bookkeeping, risk analysis, and receivables management. It uses **Gemini 1.5 Flash** (Vision) to process invoices and **LangGraph** to autonomously audit finances.
 
 ![Dashboard Preview](https://via.placeholder.com/800x400?text=Balance+AI+Dashboard)
 
@@ -9,73 +9,55 @@ Balance AI is an agentic financial system that automates the "boring" parts of b
 
 ```mermaid
 graph TD
-    User((User)) -->|Voice/Upload| Frontend[React + Shadcn UI]
-    Frontend -->|API HTTP| Backend[FastAPI]
+    User((User)) -->|Browser Port 5173| Nginx[Frontend Proxy]
+    Nginx -->|/| React[React App]
+    Nginx -->|/api| Backend[FastAPI Port 8000]
     Backend -->|Image| Vision[Gemini 1.5 Flash]
     Backend -->|Orchestrate| Agent[LangGraph Auditor]
     Backend -->|Persist| DB[(Google Sheets)]
-    Agent -->|Analyze| DB
-    Agent -->|Action| Mailer[Email Simulation]
 ```
+
+## 🚀 Quick Start (Docker)
+
+**Prerequisites**: Docker & Docker Compose.
+
+1.  **Clone & Configure**
+    ```bash
+    git clone <repo-url>
+    cd Fintine
+    cp backend/.env.example backend/.env
+    # Add your GEMINI_API_KEY in backend/.env
+    # Ensure credentials.json is in backend/
+    ```
+
+2.  **Run with Docker** (Recommended)
+    ```bash
+    docker-compose up --build
+    ```
+
+3.  **Access App**
+    -   **Frontend**: [http://localhost:5173](http://localhost:5173) (Use this!)
+    -   **API Docs**: [http://localhost:5173/api/docs](http://localhost:5173/api/docs)
+
+    > **Note**: The Frontend uses an Nginx Reverse Proxy to route `/api` calls to the backend. Do not try to access the backend via port 8000 directly from the browser to avoid CORS issues.
 
 ## 🛠️ Tech Stack
-- **Frontend**: React, Tailwind CSS, shadcn/ui, Recharts, Framer Motion
-- **Backend**: FastAPI, Python 3.10+
-- **AI Core**: Google Gemini 1.5 Flash (Vision + Reasoning)
-- **Agent Framework**: LangGraph (Stateful Orchestration)
-- **Database**: Google Sheets API (low-code, persistent)
-- **Deployment**: Dockerized Containers
+-   **Frontend**: React, Tailwind CSS, shadcn/ui, Nginx (Proxy)
+-   **Backend**: FastAPI, Python 3.10+
+-   **AI Core**: Google Gemini 1.5 Flash (Vision)
+-   **Agent Framework**: LangGraph
+-   **Database**: Google Sheets (Real Mode)
 
-## 🚀 Setup Instructions
-
-### Prerequisites
-- Python 3.10+
-- Node.js 18+
-- Google Cloud API Key (Gemini)
-
-### Installation
-1. **Clone the repository**
-   ```bash
-   git clone <repo-url>
-   cd Fintine
-   ```
-2. **Backend Setup**
-   ```bash
-   cd backend
-   python -m venv venv
-   source venv/bin/activate  # or venv\Scripts\activate on Windows
-   pip install -r requirements.txt
-   cp .env.example .env
-   # Add your GEMINI_API_KEY
-   ```
-3. **Frontend Setup**
-   ```bash
-   cd ../frontend
-   npm install
-   ```
-4. **Run Application**
-   ```bash
-   ./run_app.sh
-   # Access at http://localhost:5173
-   ```
+## 🧪 Testing & Development
+To run unit tests inside the container:
+```bash
+docker-compose exec backend pytest tests/
+```
 
 ## 🛡️ Responsible AI & Guardrails
-- **Prompt Injection Defense**: The Agent runs with a strict "CFO Persona" system prompt that refuses to answer non-financial queries.
-- **Hallucination Check**: We assume "Low Confidence" on low-res images and flag them for human review in the ledger (Status: 'Pending Review').
-- **Bounded Scope**: The agent has read-only access to historical data and can only *draft* emails, not send them without approval (Human-in-the-loop).
-
-## 🧪 Testing
-Run backend unit tests:
-```bash
-cd backend
-pytest tests/
-```
-
-## 🌍 Deployment
-The project includes a `docker-compose.yml` for instant deployment.
-```bash
-docker-compose up --build
-```
+-   **Strict Persona**: System prompts enforce a "CFO" role, rejecting non-financial queries.
+-   **Visual Guardrails**: Gemini Vision validates if an image is actually a receipt before processing.
+-   **Human-in-the-Loop**: All AI actions (emails, payments) require manual approval in the "Agent Terminal".
 
 ---
-*Built for AgentxHackathon 2026*
+*Built for Hackathon 2026*

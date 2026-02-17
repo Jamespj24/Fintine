@@ -11,7 +11,7 @@
   - **AI**: Gemini 1.5 Flash (Vision + Text) via `tools/gemini.py`.
   - **Agent**: LangGraph state machine in `graph.py`.
   - **Database**: Google Sheets (Real Mode active).
-- **Frontend**: React + Vite (Port 5173). Basic implementation done.
+- **Frontend**: React + Vite (Port 5173). Served via Nginx with Reverse Proxy (`/api` -> Backend).
 - **Infrastructure**: Dockerized (`docker-compose.yml`).
 
 ## 🔑 Key Configuration

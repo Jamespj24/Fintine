@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 // Initial Budget (Default)
 const DEFAULT_BUDGET = 50000;
 
-const API_URL = "http://localhost:8000";
+const API_URL = "/api";
 
 const Dashboard = () => {
     const [logs, setLogs] = useState([]);
@@ -103,14 +103,18 @@ const Dashboard = () => {
             const visionActive = data.components?.vision === "active";
             const dbActive = data.components?.database === "active";
 
+            console.log("Health Data:", data);
+
             if (visionActive && dbActive) {
                 setAgentStatus("active");
             } else if (visionActive || dbActive) {
                 setAgentStatus("limited");
             } else {
+                console.warn("Agent Offline Logic Triggered", { visionActive, dbActive });
                 setAgentStatus("offline"); // Or inactive
             }
         } catch (e) {
+            console.error("Agent Health Check Failed:", e);
             setAgentStatus("offline");
         }
     };
