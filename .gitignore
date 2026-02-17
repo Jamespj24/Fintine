@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+
+# Env & Secrets
+.env
+.env.local
+credentials.json
+*.pem
+
+# System
+.DS_Store
+dist/
+build/
+coverage/
