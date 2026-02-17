@@ -1,22 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Upload, AlertTriangle, CheckCircle, DollarSign, Activity } from 'lucide-react';
+import { Upload, AlertTriangle, CheckCircle, Wallet, Activity } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AgentTerminal from './AgentTerminal';
 import VoiceCommand from './VoiceCommand';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
-// Mock Data for Chart
-const burnRateData = [
-    { name: 'Mon', amount: 4000 },
-    { name: 'Tue', amount: 3000 },
-    { name: 'Wed', amount: 2000 },
-    { name: 'Thu', amount: 2780 },
-    { name: 'Fri', amount: 1890 },
-    { name: 'Sat', amount: 2390 },
-    { name: 'Sun', amount: 3490 },
-];
+// Initial Budget (Default)
+const DEFAULT_BUDGET = 50000;
 
 const API_URL = "http://localhost:8000";
 
@@ -26,6 +18,48 @@ const Dashboard = () => {
     const [agentStatus, setAgentStatus] = useState("checking");
     const [file, setFile] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [budget, setBudget] = useState(DEFAULT_BUDGET);
+    const [isEditingBudget, setIsEditingBudget] = useState(false);
+    const fileInputRef = useRef(null);
+
+    // Derived KPIs
+    const totalSpent = ledger.reduce((acc, item) => {
+        const amount = parseFloat(String(item.amount).replace(/[^0-9.-]+/g, ""));
+        return acc + (isNaN(amount) ? 0 : amount);
+    }, 0);
+
+    // Dynamic Burn Rate (Avg Daily Spend * 30)
+    // 1. Group by Date
+    const dailySpend = ledger.reduce((acc, item) => {
+        const date = item.date;
+        const amount = parseFloat(String(item.amount).replace(/[^0-9.-]+/g, ""));
+        if (!isNaN(amount)) {
+            acc[date] = (acc[date] || 0) + amount;
+        }
+        return acc;
+    }, {});
+
+    // 2. Format for Chart
+    const burnRateData = Object.keys(dailySpend)
+        .sort() // Sort by date
+        .slice(-7) // Last 7 days
+        .map(date => ({
+            name: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
+            amount: dailySpend[date]
+        }));
+
+    // If no data, show empty placeholder or just 0
+    if (burnRateData.length === 0) {
+        burnRateData.push({ name: 'Today', amount: 0 });
+    }
+
+    // 3. Calculate Burn Rate (Monthly Projection)
+    const daysTracked = Object.keys(dailySpend).length || 1;
+    const avgDaily = totalSpent / daysTracked;
+    const projectedBurn = avgDaily * 30;
+
+    const cashOnHand = budget - totalSpent;
+    const pendingCount = ledger.filter(i => i.status === "Pending").length;
 
     // Initial Fetch & Polling
     useEffect(() => {
@@ -118,7 +152,7 @@ const Dashboard = () => {
         console.log("Voice Command:", text);
         // Hacky Voice Logic
         if (text.toLowerCase().includes("upload")) {
-            document.getElementById('file-upload').click();
+            fileInputRef.current?.click();
         }
         if (text.toLowerCase().includes("risk") || text.toLowerCase().includes("audit")) {
             await fetch(`${API_URL}/agent/run`, { method: "POST" });
@@ -130,6 +164,25 @@ const Dashboard = () => {
                 body: JSON.stringify({ type: "email", details: "Drafted email to Client X" })
             });
         }
+    };
+
+    const handleCreateInvoice = async () => {
+        await fetch(`${API_URL}/simulation/event`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "invoice", details: "Generated new invoice #INV-2024-001 for $1,500" })
+        });
+        // Poll immediately to show log
+        fetchLogs();
+    };
+
+    const handleFreezeSpending = async () => {
+        await fetch(`${API_URL}/simulation/event`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "alert", details: "⛔ SPENDING FROZEN via Manual Override" })
+        });
+        fetchLogs();
     };
 
     return (
@@ -176,9 +229,9 @@ const Dashboard = () => {
                     {/* KPI Cards */}
                     <div className="grid grid-cols-3 gap-4">
                         {[
-                            { label: "Cash on Hand", value: "$42,500", icon: DollarSign, color: "text-white" },
-                            { label: "Burn Rate", value: "$3,200/mo", icon: Activity, color: "text-red-400" },
-                            { label: "Pending Invoices", value: ledger.filter(i => i.status === "Pending").length, icon: AlertTriangle, color: "text-yellow-400" },
+                            { label: "Cash on Hand", value: `₹${cashOnHand.toLocaleString()}`, icon: Wallet, color: "text-white" },
+                            { label: "Projected Burn (Mo)", value: `₹${Math.round(projectedBurn).toLocaleString()}`, icon: Activity, color: "text-red-400" },
+                            { label: "Pending Invoices", value: pendingCount, icon: AlertTriangle, color: "text-yellow-400" },
                         ].map((kpi, i) => (
                             <motion.div
                                 key={i}
@@ -191,7 +244,26 @@ const Dashboard = () => {
                                     <span className="text-neutral-500 text-sm font-medium">{kpi.label}</span>
                                     <kpi.icon className={cn("h-5 w-5", kpi.color)} />
                                 </div>
-                                <div className="text-2xl font-bold">{kpi.value}</div>
+                                <div className="text-2xl font-bold flex items-center gap-2">
+                                    {kpi.label === "Cash on Hand" ? (
+                                        isEditingBudget ? (
+                                            <input
+                                                type="number"
+                                                className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm w-32 text-white"
+                                                value={budget}
+                                                onChange={(e) => setBudget(parseFloat(e.target.value))}
+                                                onBlur={() => setIsEditingBudget(false)}
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <span onClick={() => kpi.label === "Cash on Hand" && setIsEditingBudget(true)} className="cursor-pointer hover:underline decoration-dashed decoration-neutral-600 underline-offset-4" title="Click to edit starting balance">
+                                                {kpi.value}
+                                            </span>
+                                        )
+                                    ) : (
+                                        kpi.value
+                                    )}
+                                </div>
                             </motion.div>
                         ))}
                     </div>
@@ -226,13 +298,13 @@ const Dashboard = () => {
                             <div className="relative">
                                 <input
                                     type="file"
-                                    id="file-upload"
+                                    ref={fileInputRef}
                                     className="hidden"
                                     onChange={handleFileUpload}
                                     accept="image/*,application/pdf"
                                 />
                                 <label
-                                    htmlFor="file-upload"
+                                    onClick={() => fileInputRef.current?.click()}
                                     className="cursor-pointer flex items-center gap-2 text-sm text-neutral-400 hover:text-white transition-colors"
                                 >
                                     <Upload className="h-4 w-4" /> Upload Receipt
@@ -244,6 +316,7 @@ const Dashboard = () => {
                                 <tr>
                                     <th className="p-4 font-medium">Date</th>
                                     <th className="p-4 font-medium">Vendor</th>
+                                    <th className="p-4 font-medium">Description</th>
                                     <th className="p-4 font-medium">Category</th>
                                     <th className="p-4 font-medium">Amount</th>
                                     <th className="p-4 font-medium">Status</th>
@@ -259,10 +332,11 @@ const Dashboard = () => {
                                     >
                                         <td className="p-4 text-neutral-400">{item.date}</td>
                                         <td className="p-4 font-medium">{item.vendor}</td>
+                                        <td className="p-4 text-neutral-400 text-xs max-w-[200px] truncate" title={item.description}>{item.description}</td>
                                         <td className="p-4">
                                             <span className="px-2 py-1 bg-neutral-800 rounded-md text-xs">{item.category}</span>
                                         </td>
-                                        <td className="p-4">{item.amount}</td>
+                                        <td className="p-4">₹{String(item.amount).replace('$', '')}</td>
                                         <td className="p-4">
                                             <span className={cn(
                                                 "px-2 py-1 rounded-full text-xs font-medium flex items-center w-fit gap-1",
@@ -276,6 +350,11 @@ const Dashboard = () => {
                                 ))}
                             </tbody>
                         </table>
+                        {ledger.length === 0 && (
+                            <div className="p-8 text-center text-neutral-500">
+                                No transactions found. Upload a receipt to get started.
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -287,13 +366,13 @@ const Dashboard = () => {
                     <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl space-y-4">
                         <h3 className="text-sm font-medium text-neutral-400 uppercase tracking-widest">Manual Override</h3>
                         <div className="space-y-2">
-                            <Button variant="secondary" className="w-full justify-start text-sm">
+                            <Button variant="secondary" className="w-full justify-start text-sm" onClick={handleCreateInvoice}>
                                 Create New Invoice
                             </Button>
                             <Button variant="secondary" className="w-full justify-start text-sm" onClick={() => handleVoiceCommand("email")}>
                                 Send Reminders
                             </Button>
-                            <Button variant="destructive" className="w-full justify-start text-sm bg-red-900/20 text-red-400 hover:bg-red-900/40">
+                            <Button variant="destructive" className="w-full justify-start text-sm bg-red-900/20 text-red-400 hover:bg-red-900/40" onClick={handleFreezeSpending}>
                                 Freeze Spending
                             </Button>
                         </div>
