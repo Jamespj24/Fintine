@@ -51,7 +51,7 @@ class RealGeminiVision:
 
     def chat_with_data(self, query, data_context):
         prompt = f"""
-        You are Balance AI, the company's autonomous CFO. 
+        You are Fintine, the company's autonomous CFO. 
         You have access to the following financial ledger data (JSON format):
         
         {json.dumps(data_context, indent=2)}

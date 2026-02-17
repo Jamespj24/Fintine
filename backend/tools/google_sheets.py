@@ -11,7 +11,9 @@ _sheet_instance = None
 class RealSheetAppender:
     def __init__(self):
         self.scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds_file = "credentials.json"
+        # Resolve path relative to the backend directory, not the CWD
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        creds_file = os.path.join(backend_dir, "credentials.json")
         
         if not os.path.exists(creds_file):
             raise Exception("No credentials.json found. Cannot connect to Google Sheets.")
@@ -53,6 +55,20 @@ class RealSheetAppender:
         except Exception as e:
             print(f"❌ Sheets Append Error: {e}")
             return {"status": "error", "message": str(e), "type": "real_failed"}
+
+    def update_cell(self, row, col, value):
+        """Update a single cell. row and col are 1-indexed sheet coordinates."""
+        try:
+            self._reconnect_if_needed()
+            # Convert col number to letter (1=A, 2=B, ... 7=G)
+            col_letter = chr(ord('A') + col - 1)
+            cell_ref = f"{col_letter}{row}"
+            print(f"📝 Updating cell {cell_ref} to '{value}'")
+            self.sheet.update(cell_ref, [[value]])
+            return {"status": "success"}
+        except Exception as e:
+            print(f"❌ Sheets Update Error: {e}")
+            return {"status": "error", "message": str(e)}
 
     def get_all_records(self):
         try:

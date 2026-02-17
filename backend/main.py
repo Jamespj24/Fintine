@@ -21,7 +21,7 @@ simulation_events = []
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
-    print("🚀 Balance AI Backend Starting...")
+    print("🚀 Fintine Backend Starting...")
     yield
     # Shutdown logic
     print("🛑 Shutting down...")
@@ -43,7 +43,7 @@ app.add_middleware(
 
 @app.get("/")
 def health_check():
-    return {"status": "ok", "agent": "Balance AI v1.0"}
+    return {"status": "ok", "agent": "Fintine v1.0"}
 
 @app.post("/upload")
 async def upload_receipt(file: UploadFile = File(...)):
@@ -166,6 +166,26 @@ async def get_ledger():
             normalized_records.append({k.lower(): v for k, v in r.items()})
             
         return {"status": "success", "data": normalized_records}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class StatusUpdate(BaseModel):
+    status: str
+
+@app.put("/ledger/{row_index}/status")
+async def update_ledger_status(row_index: int, body: StatusUpdate):
+    """Update the status of a ledger row. row_index is 0-based (first data row = 0)."""
+    try:
+        db = get_sheet_db()
+        # Sheet row = row_index + 2 (1 for 0-index, 1 for header row)
+        sheet_row = row_index + 2
+        # Status is column 7
+        result = db.update_cell(sheet_row, 7, body.status)
+        if result["status"] == "error":
+            raise HTTPException(status_code=500, detail=result["message"])
+        return {"status": "success", "row": row_index, "new_status": body.status}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

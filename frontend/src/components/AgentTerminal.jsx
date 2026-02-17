@@ -76,7 +76,7 @@ const AgentTerminal = ({ logs = [] }) => {
             <div className="bg-neutral-950 p-3 border-b border-neutral-800 flex justify-between items-center">
                 <div className="flex items-center gap-2 text-green-500">
                     <Terminal className="h-4 w-4" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Balance AI Agent</span>
+                    <span className="text-xs font-bold uppercase tracking-wider">Fintine Agent</span>
                 </div>
                 <div className="flex gap-1.5">
                     <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" />
