@@ -1,28 +1,18 @@
 import google.generativeai as genai
 import os
 import json
-import time
 
-class MockGeminiVision:
-    def analyze_image(self, image_bytes, mime_type="image/jpeg"):
-        print("⚠️  USING MOCK GEMINI - RETURNING CANNED RESPONSE")
-        time.sleep(1.5) # Simulate processing delay
-        return {
-            "vendor": "Starbucks Coffee",
-            "amount": 5.40,
-            "currency": "USD",
-            "date": "2023-10-25",
-            "category": "Food & Drink",
-            "description": "Latte & Croissant"
-        }
+# --- Singleton Gemini Instance ---
+_gemini_instance = None
 
 class RealGeminiVision:
     def __init__(self):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            raise Exception("No GEMINI_API_KEY found")
+            raise Exception("No GEMINI_API_KEY found in environment. Set it in .env")
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.5-flash')
+        print("✅ Gemini Vision initialized (gemini-2.5-flash)")
 
     def analyze_image(self, image_data, mime_type="image/jpeg"):
         prompt = """
@@ -32,7 +22,6 @@ class RealGeminiVision:
         - If the image is NOT a receipt, invoice, or financial document, return JSON with {"error": "Irrelevant image detected"}.
         - Do not hallucinate values. If a field is missing, use null or 0.
         
-        Extract the following details in JSON format:
         Extract the following details in JSON format:
         - vendor (string)
         - amount (number)
@@ -45,33 +34,48 @@ class RealGeminiVision:
         Return ONLY valid JSON. No markdown backticks.
         """
         
-        try:
-            # image_data is bytes
-            response = self.model.generate_content([
-                prompt,
-                {
-                    "mime_type": mime_type,
-                    "data": image_data
-                }
-            ])
-            # Clean response text
-            text = response.text.strip()
-            if text.startswith("```json"):
-                text = text[7:-3]
-            elif text.startswith("```"):
-                text = text[3:-3]
-            return json.loads(text)
-        except Exception as e:
-            print(f"❌ Gemini Error: {e}")
-            print("⚠️  Falling back to Mock Gemini due to API error.")
-            return MockGeminiVision().analyze_image(image_data, mime_type)
+        response = self.model.generate_content([
+            prompt,
+            {
+                "mime_type": mime_type,
+                "data": image_data
+            }
+        ])
+        # Clean response text
+        text = response.text.strip()
+        if text.startswith("```json"):
+            text = text[7:-3]
+        elif text.startswith("```"):
+            text = text[3:-3]
+        return json.loads(text)
+
+    def chat_with_data(self, query, data_context):
+        prompt = f"""
+        You are Balance AI, the company's autonomous CFO. 
+        You have access to the following financial ledger data (JSON format):
+        
+        {json.dumps(data_context, indent=2)}
+        
+        User Query: "{query}"
+        
+        Instructions:
+        1. Answer the user's question accurately based ONLY on the data provided.
+        2. Be concise and professional, but friendly.
+        3. If you calculate totals, show your math briefly (e.g. "Found 3 items...").
+        4. If the data doesn't contain the answer, say so clearly.
+        5. Use currency symbols correctly (₹ for INR, $ for USD).
+        6. IMPORTANT: Respond in PLAIN TEXT only. Do NOT use any markdown formatting like **, ##, or bullet points with *. Use simple dashes (-) for lists.
+        """
+        
+        response = self.model.generate_content(prompt)
+        return response.text.strip()
 
 def get_vision_model():
-    if os.getenv("USE_MOCK_GEMINI", "false").lower() == "true":
-        return MockGeminiVision()
+    """Returns a singleton RealGeminiVision. Raises if API key missing."""
+    global _gemini_instance
     
-    try:
-        return RealGeminiVision()
-    except Exception as e:
-        print(f"⚠️  Gemini Init Failed: {e}. Switching to Mock Mode.")
-        return MockGeminiVision()
+    if _gemini_instance is not None:
+        return _gemini_instance
+    
+    _gemini_instance = RealGeminiVision()
+    return _gemini_instance

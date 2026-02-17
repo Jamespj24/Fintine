@@ -4,67 +4,50 @@ import os
 import json
 from datetime import datetime
 
-class MockSheetAppender:
-    def __init__(self):
-        # Initial Seed Data for Mock Mode (So it's not empty)
-        self.data = [
-             {"date": "2023-10-24", "vendor": "AWS Web Services", "amount": "$1,200.00", "category": "Infrastructure", "description": "Cloud Hosting", "billed_to": "Fintine Inc", "status": "Paid"},
-             {"date": "2023-10-25", "vendor": "WeWork", "amount": "$850.00", "category": "Office", "description": "Co-working entry", "billed_to": "John Doe", "status": "Paid"}
-        ]
-        print("⚠️  USING MOCK SHEETS DB - DATA WILL NOT PERSIST")
-
-    def append_row(self, values):
-        # Value is list: [Date, Vendor, Amount, Category, Description, BilledTo, Status]
-        # Convert to dict for get_all_records consistency in mock
-        record = {
-            "date": values[0],
-            "vendor": values[1],
-            "amount": f"${values[2]}",
-            "category": values[3],
-            "description": values[4],
-            "billed_to": values[5],
-            "status": values[6]
-        }
-        print(f"📝 [MOCK] Appending to sheet: {record}")
-        self.data.insert(0, record) # Prepend
-        return {"status": "success", "row": len(self.data)}
-
-    def get_all_records(self):
-        return self.data
+# --- Singleton Sheet Connection ---
+# This prevents re-authenticating on every API call, which causes rate-limiting.
+_sheet_instance = None
 
 class RealSheetAppender:
-    def __init__(self, check_connection=True):
+    def __init__(self):
         self.scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        # Load from env or file
         creds_file = "credentials.json"
         
-        if os.path.exists(creds_file):
-             self.creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, self.scope)
-        else:
-             raise Exception("No credentials.json found")
-             
+        if not os.path.exists(creds_file):
+            raise Exception("No credentials.json found. Cannot connect to Google Sheets.")
+              
+        self.creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, self.scope)
         self.client = gspread.authorize(self.creds)
         
-        # Open the sheet (assumes one exists or uses the first one)
         try:
             self.sheet = self.client.open("BalanceAI_Ledger").sheet1
-        except Exception:
-             print("❌ Could not open 'BalanceAI_Ledger'. Falling back to Mock.")
-             raise Exception("Sheet not found")
+            print("✅ Connected to Google Sheet: BalanceAI_Ledger")
+        except Exception as e:
+            raise Exception(f"Sheet 'BalanceAI_Ledger' not found: {e}")
 
-        # Check for headers and init if empty
+        # Check headers once on init
         try:
             rows = self.sheet.get_all_values()
             if not rows:
                 print("📝 Initializing Sheet Headers...")
                 self.sheet.append_row(["date", "vendor", "amount", "category", "description", "billed_to", "status"])
-            elif "billed_to" not in [str(c).lower().strip() for c in rows[0]]:
-                 print("⚠️ 'billed_to' column missing in existing sheet. Appending to header (User may need to fix manually).")
         except Exception as e:
             print(f"⚠️ Error checking headers: {e}")
 
+    def _reconnect_if_needed(self):
+        """Re-authorize if the token has expired."""
+        try:
+            if self.creds.access_token_expired:
+                self.client = gspread.authorize(self.creds)
+                self.sheet = self.client.open("BalanceAI_Ledger").sheet1
+                print("🔄 Re-authorized Google Sheets connection.")
+        except Exception as e:
+            print(f"⚠️ Reconnect failed: {e}")
+            raise
+
     def append_row(self, values):
         try:
+            self._reconnect_if_needed()
             self.sheet.append_row(values)
             return {"status": "success", "type": "real"}
         except Exception as e:
@@ -72,45 +55,46 @@ class RealSheetAppender:
             return {"status": "error", "message": str(e), "type": "real_failed"}
 
     def get_all_records(self):
-        # Returns list of dicts
         try:
-             rows = self.sheet.get_all_values()
-             if not rows:
-                 return []
+            self._reconnect_if_needed()
+            rows = self.sheet.get_all_values()
+            if not rows:
+                return []
              
-             # Check if first row is header
-             first_row = [str(c).lower().strip() for c in rows[0]]
-             if "date" in first_row and "vendor" in first_row:
-                 rows = rows[1:] # Skip header
+            # Check if first row is header
+            first_row = [str(c).lower().strip() for c in rows[0]]
+            if "date" in first_row and "vendor" in first_row:
+                rows = rows[1:]  # Skip header
                  
-             records = []
-             for row in rows:
-                 # Ensure row has enough columns (pad with empty strings)
-                 while len(row) < 7:
-                     row.append("")
+            records = []
+            for row in rows:
+                # Pad row to 7 columns
+                while len(row) < 7:
+                    row.append("")
                      
-                 record = {
-                     "date": row[0],
-                     "vendor": row[1],
-                     "amount": row[2],
-                     "category": row[3],
-                     "description": row[4],
-                     "billed_to": row[5],
-                     "status": row[6]
-                 }
-                 records.append(record)
+                record = {
+                    "date": row[0],
+                    "vendor": row[1],
+                    "amount": row[2],
+                    "category": row[3],
+                    "description": row[4],
+                    "billed_to": row[5],
+                    "status": row[6]
+                }
+                records.append(record)
                  
-             return records
+            return records
         except Exception as e:
-             print(f"❌ Error fetching records: {e}")
-             return []
+            print(f"❌ Error fetching records: {e}")
+            raise  # Don't silently return empty — let the caller handle it
 
 def get_sheet_db():
-    if os.getenv("USE_MOCK_SHEETS", "false").lower() == "true":
-        return MockSheetAppender()
+    """Returns a singleton RealSheetAppender. Raises if connection fails."""
+    global _sheet_instance
     
-    try:
-        return RealSheetAppender()
-    except Exception as e:
-        print(f"⚠️  Google Sheets Auth Failed: {e}. Switching to Mock Mode.")
-        return MockSheetAppender()
+    if _sheet_instance is not None:
+        return _sheet_instance
+    
+    # Always try real sheets — no mock fallback
+    _sheet_instance = RealSheetAppender()
+    return _sheet_instance

@@ -169,6 +169,34 @@ async def get_ledger():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class ChatRequest(BaseModel):
+    query: str
+
+@app.post("/agent/chat")
+async def chat_with_agent(request: ChatRequest):
+    print(f"💬 Chat Query: {request.query}")
+    try:
+        # 1. Get Data Context
+        db = get_sheet_db()
+        records = db.get_all_records()
+        
+        # 2. Call Gemini
+        vision = get_vision_model()
+        response_text = vision.chat_with_data(request.query, records)
+        
+        # 3. Log it
+        processed_images_log.append({
+            "id": len(processed_images_log) + 1,
+            "action": "chat",
+            "details": f"Q: {request.query} | A: {response_text[:50]}...",
+            "timestamp": "Just now"
+        })
+        
+        return {"status": "success", "response": response_text}
+    except Exception as e:
+         print(f"❌ Chat Error: {e}")
+         raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/agent/health")
 async def get_agent_health():
     # Check Gemini

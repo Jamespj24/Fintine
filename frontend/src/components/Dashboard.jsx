@@ -3,7 +3,6 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Upload, AlertTriangle, CheckCircle, Wallet, Activity } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AgentTerminal from './AgentTerminal';
-import VoiceCommand from './VoiceCommand';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -153,43 +152,6 @@ const Dashboard = () => {
         }
     };
 
-    const handleVoiceCommand = async (text) => {
-        console.log("Voice Command:", text);
-        // Hacky Voice Logic
-        if (text.toLowerCase().includes("upload")) {
-            fileInputRef.current?.click();
-        }
-        if (text.toLowerCase().includes("risk") || text.toLowerCase().includes("audit")) {
-            await fetch(`${API_URL}/agent/run`, { method: "POST" });
-        }
-        if (text.toLowerCase().includes("email")) {
-            await fetch(`${API_URL}/simulation/event`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ type: "email", details: "Drafted email to Client X" })
-            });
-        }
-    };
-
-    const handleCreateInvoice = async () => {
-        await fetch(`${API_URL}/simulation/event`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ type: "invoice", details: "Generated new invoice #INV-2024-001 for $1,500" })
-        });
-        // Poll immediately to show log
-        fetchLogs();
-    };
-
-    const handleFreezeSpending = async () => {
-        await fetch(`${API_URL}/simulation/event`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ type: "alert", details: "⛔ SPENDING FROZEN via Manual Override" })
-        });
-        fetchLogs();
-    };
-
     return (
         <div className="min-h-screen bg-neutral-950 text-white p-8 font-sans">
             {/* Header */}
@@ -201,11 +163,6 @@ const Dashboard = () => {
                     <p className="text-neutral-400">Autonomous Financial Controller</p>
                 </div>
                 <div className="flex gap-4">
-                    <Button variant="outline" className="text-black border-neutral-800 hover:bg-neutral-900 hover:text-white transition-colors"
-                        onClick={() => fetch(`${API_URL}/agent/run`, { method: "POST" })}
-                    >
-                        <Activity className="mr-2 h-4 w-4" /> Run Audit
-                    </Button>
                     <div className={cn(
                         "flex items-center gap-2 px-4 py-2 rounded-full border transition-colors",
                         agentStatus === "active" ? "bg-green-500/10 border-green-500/20" :
@@ -365,29 +322,17 @@ const Dashboard = () => {
                     </div>
                 </div>
 
-                {/* Right Column: Agent & Tools */}
-                <div className="col-span-4 space-y-8">
-                    <AgentTerminal logs={logs} />
-
-                    {/* Quick Actions (Mock) */}
-                    <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl space-y-4">
-                        <h3 className="text-sm font-medium text-neutral-400 uppercase tracking-widest">Manual Override</h3>
-                        <div className="space-y-2">
-                            <Button variant="secondary" className="w-full justify-start text-sm" onClick={handleCreateInvoice}>
-                                Create New Invoice
-                            </Button>
-                            <Button variant="secondary" className="w-full justify-start text-sm" onClick={() => handleVoiceCommand("email")}>
-                                Send Reminders
-                            </Button>
-                            <Button variant="destructive" className="w-full justify-start text-sm bg-red-900/20 text-red-400 hover:bg-red-900/40" onClick={handleFreezeSpending}>
-                                Freeze Spending
-                            </Button>
-                        </div>
+                {/* Right Column: Agent Chat */}
+                <div className="col-span-4">
+                    <div className="sticky top-8">
+                        <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            Chat with Agent
+                        </h3>
+                        <AgentTerminal logs={logs} />
                     </div>
                 </div>
             </div>
-
-            <VoiceCommand onCommand={handleVoiceCommand} />
         </div>
     );
 };
