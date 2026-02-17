@@ -15,10 +15,14 @@ class RealSheetAppender:
         backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         creds_file = os.path.join(backend_dir, "credentials.json")
         
-        if not os.path.exists(creds_file):
-            raise Exception("No credentials.json found. Cannot connect to Google Sheets.")
+        if os.path.exists(creds_file):
+            self.creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, self.scope)
+        elif "GOOGLE_SHEETS_CREDENTIALS_JSON" in os.environ:
+             creds_json = json.loads(os.environ["GOOGLE_SHEETS_CREDENTIALS_JSON"])
+             self.creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_json, self.scope)
+        else:
+            raise Exception("No credentials.json found and GOOGLE_SHEETS_CREDENTIALS_JSON env var not set.")
               
-        self.creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, self.scope)
         self.client = gspread.authorize(self.creds)
         
         try:
